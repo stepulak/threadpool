@@ -4,6 +4,7 @@
 #include "threadpool.hpp"
 
 #include <cmath>
+#include <numeric>
 
 using namespace std::chrono_literals;
 
@@ -97,4 +98,46 @@ BOOST_AUTO_TEST_CASE(threadpool_queue_work_nonblocking)
 
     BOOST_REQUIRE_EQUAL(work_result, 15);
     BOOST_REQUIRE_EQUAL(pool.work_queue_size(), 0);
+}
+
+BOOST_AUTO_TEST_CASE(threadpool_queue_work_parallel_sum)
+{
+    for (size_t iterations = 0; iterations < 100; iterations++) {
+        thread_pool pool { 32 };
+        std::vector<int> numbers;
+        const size_t numbers_works = 256;
+        const size_t numbers_chunk = 256;
+        const size_t numbers_size = numbers_chunk * numbers_works;
+
+        numbers.reserve(numbers_size);
+        for (size_t i = 0; i < numbers_size; i++) {
+            numbers.emplace_back(std::rand() % 1000);
+        }
+
+        std::atomic_int parallel_sum{0};
+        std::atomic_int works_finished{0};
+
+        // parallel sum
+        for (size_t i = 0; i < numbers_works; i++) {
+            pool.queue_work([i, &numbers, numbers_chunk, &parallel_sum, &works_finished] {
+                const size_t from = i * numbers_chunk;
+                const size_t to = from + numbers_chunk;
+                int sum = 0;
+                for (size_t j = from; j < to; j++) {
+                    sum += numbers[j];
+                }
+                parallel_sum += sum;
+                works_finished++;
+            });
+        }
+
+        // Wait for result
+        while (works_finished < numbers_works) {
+            std::this_thread::sleep_for(1ms);
+        }
+
+        const int seq_sum = std::accumulate(numbers.begin(), numbers.end(), 0);
+
+        BOOST_REQUIRE_EQUAL(parallel_sum, seq_sum);
+    }
 }
