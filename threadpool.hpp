@@ -7,6 +7,8 @@
 #include <thread>
 #include <vector>
 
+/// Threadpool class.
+/// Using this class you can queue parallel work without explicit thread manipulation.
 class thread_pool {
 public:
     using work_function_t = std::function<void()>;
@@ -44,6 +46,7 @@ public:
     thread_pool(const thread_pool&) = delete;
     thread_pool& operator=(const thread_pool&) = delete;
 
+    /// Queue parallel work
     thread_pool& queue_work(work_function_t work)
     {
         std::scoped_lock<std::mutex> lock { _mutex };
